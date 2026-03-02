@@ -2,11 +2,12 @@
 
 Playwright 기반 웹 스크린샷·텍스트 추출·PDF 저장 MCP 서버
 
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white)
-![Playwright](https://img.shields.io/badge/Playwright-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)
-![MCP](https://img.shields.io/badge/MCP-Model_Context_Protocol-4A154B?style=for-the-badge)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
+<img src="https://img.shields.io/badge/TypeScript-ES2022-3178C6?style=flat&logo=typescript&logoColor=white" alt="TypeScript">
+<img src="https://img.shields.io/badge/Node.js-ES_Modules-339933?style=flat&logo=node.js&logoColor=white" alt="Node.js">
+<img src="https://img.shields.io/badge/Playwright-1.50.0-2EAD33?style=flat&logo=playwright&logoColor=white" alt="Playwright">
+<img src="https://img.shields.io/badge/MCP-Model_Context_Protocol-4A154B?style=flat" alt="MCP">
+<img src="https://img.shields.io/badge/Zod-3.25.0-3068B7?style=flat&logo=zod&logoColor=white" alt="Zod">
+<img src="https://img.shields.io/badge/License-MIT-yellow?style=flat" alt="MIT License">
 
 ## 프로젝트 개요
 
