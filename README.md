@@ -1,50 +1,122 @@
 # Web Capture MCP Server
 
-A general-purpose [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server that screenshots and extracts text from any website — including dynamic JS-rendered SPAs. Built with [Playwright](https://playwright.dev) and the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk).
+Playwright 기반 웹 스크린샷·텍스트 추출·PDF 저장 MCP 서버
 
-## Tools
+## 프로젝트 개요
 
-| Tool | Description |
-|------|-------------|
-| `web_screenshot` | Full-page screenshot + structured text extraction. Returns base64 image + JSON metadata. |
-| `web_extract` | Text-only extraction (no screenshot). Faster when you only need content. |
-| `web_pdf` | Save a page as PDF. |
+[MCP(Model Context Protocol)](https://modelcontextprotocol.io) 기반의 웹 캡처 서버입니다. Claude Code에 웹 브라우징 능력을 부여하여, AI가 실시간 웹페이지를 스크린샷하고 구조화된 텍스트를 추출할 수 있도록 합니다.
+
+- **동적 웹 지원**: JavaScript로 렌더링되는 SPA도 완전히 로드된 후 캡처
+- **구조화된 추출**: 단순 텍스트가 아닌 title, meta, headings, links 등 메타데이터를 구조화하여 반환
+- **디바이스 에뮬레이션**: iPhone, iPad, Pixel 등 실제 디바이스 viewport + User Agent 프리셋 지원
+- **MCP 네이티브 통합**: Claude Code에 도구로 등록하여 자연어 명령으로 바로 사용 가능
+
+## 주요 특징
+
+### 웹 캡처 파이프라인
+
+- **스크린샷**: 전체 페이지 또는 특정 CSS 셀렉터 영역만 PNG 캡처
+- **텍스트 추출**: 이미지 없이 구조화된 텍스트만 빠르게 추출
+- **PDF 저장**: A4, Letter 등 다양한 포맷으로 웹페이지를 PDF 변환
+
+### 디바이스 에뮬레이션
+
+Playwright 내장 디바이스 레지스트리를 활용하여 정확한 viewport와 User Agent를 에뮬레이션합니다.
+
+| 프리셋 | 기기 |
+|--------|------|
+| `iphone-14` | iPhone 14 |
+| `iphone-15` | iPhone 15 Pro Max |
+| `ipad` | iPad Pro 11 |
+| `pixel-7` | Pixel 7 |
+
+### 성능 최적화
+
+- **Lazy Browser Singleton**: 첫 요청 시 Chromium 인스턴스 생성, 이후 재사용하여 응답 속도 향상
+- **자동 다운스케일링**: MCP base64 전송 제한(~800KB) 초과 시 자동 50% 축소, 원본은 디스크 보존
+- **리소스 정리**: 요청별 브라우저 컨텍스트 격리 + 프로세스 종료 시 자동 브라우저 정리
+
+## 기술 스택
+
+| 분류 | 기술 | 용도 |
+|------|------|------|
+| 언어 | TypeScript (ES2022) | 타입 안전한 서버 구현 |
+| 런타임 | Node.js (ES Modules) | MCP 서버 실행 환경 |
+| 프로토콜 | @modelcontextprotocol/sdk v1.12.0 | MCP 서버 프레임워크 (stdio 트랜스포트) |
+| 브라우저 자동화 | Playwright v1.50.0 | Chromium 헤드리스 제어 |
+| 검증 | Zod v3.25.0 | 입력 스키마 유효성 검사 |
+
+## 프로젝트 구조
+
+```
+├── src/
+│   └── index.ts              # MCP 서버 메인 (도구 정의 + 브라우저 제어)
+├── dist/                     # 빌드 결과물
+├── package.json
+├── tsconfig.json
+├── LICENSE                   # MIT License
+└── README.md
+```
+
+## 동작 원리
+
+### 1. 브라우저 초기화
+
+첫 번째 도구 호출 시 Chromium 헤드리스 인스턴스를 생성하고, 이후 모든 요청에서 재사용합니다. 프로세스 종료 시(SIGINT, SIGTERM) 자동으로 브라우저를 정리합니다.
+
+### 2. 페이지 로딩
+
+`waitUntil: "networkidle"` 전략으로 네트워크 요청이 완료될 때까지 대기한 후, 추가 대기 시간(기본 3000ms)을 두어 클라이언트 사이드 렌더링이 완료되도록 합니다.
+
+### 3. 콘텐츠 추출
+
+브라우저 내부에서 JavaScript를 실행하여 구조화된 데이터를 추출합니다:
+- `document.title`, `meta description`, `og:image`
+- `<h1>`~`<h3>` 헤딩 목록
+- `<a>` 링크 (최대 50개)
+- `document.body.innerText` (최대 5,000자)
+
+### 4. 결과 반환
+
+- **스크린샷**: `/tmp/web-capture/`에 원본 PNG 저장 → base64 인코딩 → 크기 초과 시 자동 다운스케일링
+- **PDF**: 지정된 포맷으로 생성 후 파일 경로 반환
+- **텍스트**: JSON 형태의 구조화된 메타데이터 반환
+
+## 도구 상세
 
 ### `web_screenshot`
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `url` | string | (required) | URL to capture |
-| `viewport_width` | number | `1280` | Viewport width in px |
-| `viewport_height` | number | `720` | Viewport height in px |
-| `device` | string | — | Device preset: `iphone-14`, `iphone-15`, `ipad`, `pixel-7` |
-| `full_page` | boolean | `true` | Capture full scrollable page |
-| `wait_for` | number | `3000` | Extra ms to wait after load (for JS rendering) |
-| `selector` | string | — | CSS selector to screenshot instead of full page |
-| `javascript` | string | — | JS to run before capture (e.g. dismiss cookie banners) |
+| 파라미터 | 타입 | 기본값 | 설명 |
+|----------|------|--------|------|
+| `url` | string | (필수) | 캡처할 URL |
+| `viewport_width` | number | `1280` | 뷰포트 너비 (px) |
+| `viewport_height` | number | `720` | 뷰포트 높이 (px) |
+| `device` | string | — | 디바이스 프리셋 |
+| `full_page` | boolean | `true` | 전체 페이지 캡처 여부 |
+| `wait_for` | number | `3000` | JS 렌더링 대기 시간 (ms) |
+| `selector` | string | — | 특정 요소만 캡처할 CSS 셀렉터 |
+| `javascript` | string | — | 캡처 전 실행할 JS 코드 |
 
-**Returns:** screenshot image (base64 PNG) + JSON with title, description, headings, links, visible text, and file path.
+**반환**: 스크린샷 이미지 (base64 PNG) + 구조화된 메타데이터 JSON
 
 ### `web_extract`
 
-Same parameters as `web_screenshot` except no `full_page` or `selector`. Returns JSON only, no image.
+`web_screenshot`과 동일한 파라미터 (`full_page`, `selector` 제외). 이미지 없이 JSON만 반환하여 더 빠릅니다.
 
 ### `web_pdf`
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `url` | string | (required) | URL to save |
-| `viewport_width` | number | `1280` | Viewport width |
-| `viewport_height` | number | `720` | Viewport height |
-| `format` | string | `A4` | Page format: `A4`, `Letter`, `Legal`, `Tabloid`, `A3` |
-| `wait_for` | number | `3000` | Extra ms to wait |
-| `javascript` | string | — | JS to run before PDF generation |
+| 파라미터 | 타입 | 기본값 | 설명 |
+|----------|------|--------|------|
+| `url` | string | (필수) | PDF로 저장할 URL |
+| `format` | string | `A4` | 페이지 포맷: `A4`, `Letter`, `Legal`, `Tabloid`, `A3` |
+| `wait_for` | number | `3000` | JS 렌더링 대기 시간 (ms) |
+| `javascript` | string | — | PDF 생성 전 실행할 JS 코드 |
 
-**Returns:** file path of the saved PDF.
+**반환**: 저장된 PDF 파일 경로
 
-## Setup
+## 시작하기
 
-### 1. Clone and install
+### 1. 클론 및 설치
 
 ```bash
 git clone https://github.com/Happ11quokka/Web-Capture.git ~/.claude/tools/web-capture
@@ -53,45 +125,44 @@ npm install
 npx playwright install chromium
 ```
 
-### 2. Build
+### 2. 빌드
 
 ```bash
 npm run build
 ```
 
-### 3. Register with Claude Code
+### 3. Claude Code에 등록
 
 ```bash
 claude mcp add -s user web-capture -- node ~/.claude/tools/web-capture/dist/index.js
 ```
 
-This registers the server globally (user scope) so it's available in every project.
+글로벌(user scope)로 등록되어 모든 프로젝트에서 사용할 수 있습니다.
 
-### 4. Verify
+### 4. 확인
 
-Restart Claude Code, then run `/mcp` to confirm `web_screenshot`, `web_extract`, and `web_pdf` tools are available.
+Claude Code를 재시작한 후 `/mcp` 명령으로 `web_screenshot`, `web_extract`, `web_pdf` 도구가 등록되었는지 확인합니다.
 
-## Usage Examples
+### 사용 예시
 
-Once registered, ask Claude:
+```
+"https://example.com 스크린샷 찍어줘"
+"https://example.com을 iphone-14로 스크린샷"
+"https://news.ycombinator.com에서 텍스트 추출해줘"
+"https://example.com을 PDF로 저장해줘"
+```
 
-- "Screenshot https://example.com"
-- "Screenshot https://example.com on iphone-14"
-- "Extract text from https://news.ycombinator.com"
-- "Save https://example.com as PDF"
-- "Screenshot https://example.com but first dismiss the cookie banner with `document.querySelector('.cookie-banner')?.remove()`"
+## 기술적 의사결정
 
-## How It Works
+| 선택 | 이유 |
+|------|------|
+| Playwright | Puppeteer 대비 다중 브라우저 지원, 내장 디바이스 레지스트리로 정확한 에뮬레이션, `networkidle` 대기 전략 |
+| Lazy Browser Singleton | 매 요청마다 브라우저 재시작 비용 제거, 컨텍스트 격리로 요청 간 안전성 유지 |
+| Zod 스키마 검증 | MCP 프로토콜의 JSON Schema 요구사항 충족 + 런타임 타입 안전성 확보 |
+| stdio 트랜스포트 | Claude Code 네이티브 통합, HTTP 서버 없이 프로세스 간 직접 통신 |
+| 자동 다운스케일링 | MCP base64 전송 제한(~800KB) 대응, 원본 파일은 디스크에 보존하여 품질 손실 없음 |
+| ES Modules + ES2022 | 최신 JavaScript 기능 활용, top-level await 등 비동기 패턴 지원 |
 
-- **Playwright** launches a headless Chromium instance on first tool call and reuses it
-- Pages are loaded with `waitUntil: "networkidle"` + a configurable extra wait for client-side rendering
-- Content extraction runs a browser-side script that pulls `document.title`, meta tags, `<h1>`-`<h3>` headings, `<a>` links, and `document.body.innerText`
-- Screenshots are saved to `/tmp/web-capture/` at full resolution; if the base64 exceeds ~800KB (MCP's practical limit), a downscaled version is sent to Claude while the full-size file remains on disk
-- Device presets use Playwright's built-in device registry for accurate viewport + user agent emulation
+## 라이선스
 
-## Tech Stack
-
-- **TypeScript** + **Node.js** (ES2022)
-- **@modelcontextprotocol/sdk** — MCP server framework (stdio transport)
-- **Playwright** — browser automation
-- **Zod** — input schema validation
+MIT License
