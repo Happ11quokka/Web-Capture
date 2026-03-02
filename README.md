@@ -2,6 +2,12 @@
 
 Playwright 기반 웹 스크린샷·텍스트 추출·PDF 저장 MCP 서버
 
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white)
+![Playwright](https://img.shields.io/badge/Playwright-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)
+![MCP](https://img.shields.io/badge/MCP-Model_Context_Protocol-4A154B?style=for-the-badge)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
+
 ## 프로젝트 개요
 
 [MCP(Model Context Protocol)](https://modelcontextprotocol.io) 기반의 웹 캡처 서버입니다. Claude Code에 웹 브라우징 능력을 부여하여, AI가 실시간 웹페이지를 스크린샷하고 구조화된 텍스트를 추출할 수 있도록 합니다.
